@@ -112,10 +112,10 @@ isWinning board player =
 
 hasOpenPath :: Board -> Coord -> Bool
 hasOpenPath board (i, j) =
-  not $ null $ filter (\(i, _) -> i == playerWinningRow) moves
+  not $ null $ filter (\(i, _) -> i == playerWinningRowIdx) moves
   where player = fromJust $ playerAt board (i, j)
         moves = getPossibleCoordsFromCoord board (i, j)
-        playerWinningRow = case player of
+        playerWinningRowIdx = case player of
           White -> 0
           Black -> gridSize - 1
 
