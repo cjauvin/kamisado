@@ -81,13 +81,13 @@ updateBoard board (i0, j0) (i1, j1) =
         dstRow = update j1 dstCell $ index board i1
         dstBoard = update i1 dstRow $ board
 
-getPlayerCoords :: Board -> Player -> [Coord]
-getPlayerCoords board player =
+getPlayerPieceCoords :: Board -> Player -> [Coord]
+getPlayerPieceCoords board player =
   filter (\(i, j) -> (playerAt board (i, j)) == Just player) coords
   where coords = [(i, j) | i <- [0..gridSize-1], j <- [0..gridSize-1]]
 
-getPlayerColorCoord :: Board -> Player -> Color -> Coord
-getPlayerColorCoord board player color =
+getPlayerPieceColorCoord :: Board -> Player -> Color -> Coord
+getPlayerPieceColorCoord board player color =
   fromJust $ find (\(i, j) -> (pieceAt board (i, j)) == (Just $ Piece player color)) coords
   where coords = [(i, j) | i <- [0..gridSize-1], j <- [0..gridSize-1]]
 
@@ -104,8 +104,9 @@ getPossibleCoordsFromCoord board (i, j) =
 isWinning :: Board -> Player -> Bool
 isWinning board player =
   any (Just player ==) playersInWinningRow
-  where playersInWinningRow = fmap (fmap getPlayer) (fmap snd $ index board playerWinningRow)
-        playerWinningRow = case player of
+  where playersInWinningRow = fmap (fmap getPlayer) playerWinningRow
+        playerWinningRow = fmap snd $ index board rowIdx
+        rowIdx = case player of
           White -> 0
           Black -> gridSize - 1
 
@@ -121,7 +122,7 @@ hasOpenPath board (i, j) =
 getBoardPotentialValueForPlayer :: Board -> Player -> Double
 getBoardPotentialValueForPlayer board player =
   fromIntegral $ length $ filter (\(i, j) -> hasOpenPath board (i, j)) coords
-  where coords = getPlayerCoords board player
+  where coords = getPlayerPieceCoords board player
 
 boardValueForPlayer :: Board -> Player -> Double
 boardValueForPlayer board player =
@@ -133,7 +134,7 @@ boardValueForPlayer board player =
 findBestMoveCoord :: Board -> Player -> Color -> Int -> Coord
 findBestMoveCoord board player color depth =
   snd $ maximum $ valueCoordPairs
-  where srcCoord = getPlayerColorCoord board player color
+  where srcCoord = getPlayerPieceColorCoord board player color
         dstCoords = [(i, j) | (i, j) <- getPossibleCoordsFromCoord board srcCoord]
         nextPlayer = if player == White then Black else White
         negamaxCall = \dstCoord -> negamax (updateBoard board srcCoord dstCoord)
@@ -150,7 +151,7 @@ negamax board player color depth
       (case null dstCoords of
         True -> negamax board nextPlayer color (depth - 1)
         False -> maximum $ map nextNegamaxCall dstCoords)
-      where srcCoord = getPlayerColorCoord board player color
+      where srcCoord = getPlayerPieceColorCoord board player color
             dstCoords = [(i, j) | (i, j) <- getPossibleCoordsFromCoord board srcCoord]
             nextPlayer = if player == White then Black else White
             fn = if player == White then negate else id
@@ -165,7 +166,8 @@ isLegalMove board player color src dst =
   where colorOK = (color == Nothing) || (Just $ colorAt board src) == color
         srcOK = (pieceAt board src) /= Nothing
         playerOK = (playerAt board src) == Just player
-        srcColorOK = (color == Nothing) || (getPlayerColorCoord board player (fromJust color)) == src
+        srcColorOK = (color == Nothing) ||
+                     (getPlayerPieceColorCoord board player (fromJust color)) == src
         dstOK = dst `elem` getPossibleCoordsFromCoord board src
 
 play :: Board -> Maybe Color -> IO ()
@@ -179,7 +181,7 @@ play board color = do
     else do
       let humanBoard = updateBoard board humanSrcCoord humanDstCoord
           humanColor = colorAt humanBoard humanDstCoord
-          cpuSrcCoord = getPlayerColorCoord humanBoard Black humanColor
+          cpuSrcCoord = getPlayerPieceColorCoord humanBoard Black humanColor
           cpuDstCoord = findBestMoveCoord humanBoard Black humanColor 2
           cpuBoard = updateBoard humanBoard cpuSrcCoord cpuDstCoord
           cpuColor = colorAt cpuBoard cpuDstCoord
