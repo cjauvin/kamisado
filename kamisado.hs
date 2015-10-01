@@ -29,6 +29,8 @@ type Cell = (Color, Maybe Piece)
 type Board = Seq (Seq (Cell))
 type Coord = (Int, Int)
 
+inf = (read "Infinity")::Double
+
 initBoard :: Board
 initBoard = fromList [
   fromList [(Red, Just $ Piece Black Red), (Green, Just $ Piece Black Green),
@@ -40,9 +42,9 @@ initBoard = fromList [
 
 gridSize = length initBoard
 
-b0 = initBoard
-b1 = updateBoard initBoard (3, 0) (1, 0) -- White played, on Y
-b2 = updateBoard b1 (0, 3) (3, 0) -- Black played, from Y
+-- b0 = initBoard
+-- b1 = updateBoard initBoard (3, 0) (1, 0) -- White played, on Y
+-- b2 = updateBoard b1 (0, 3) (3, 0) -- Black played, from Y
 
 cellAt :: Board -> Coord -> Cell
 cellAt board (i, j) = index (index board i) j
@@ -98,14 +100,6 @@ getPossibleCoordsFromCoord board (i, j) =
              [downleftward (i, j), downward (i, j), downrightward (i, j)]
   where constrainMoves = takeWhile $ cellEmpty board
         player = fromJust $ playerAt board (i, j)
-
--- getBoardsForPotentialPlayerMoves :: Board -> Coord -> [Board]
--- getBoardsForPotentialPlayerMoves board (i0, j0) =
---   map (\(i1, j1) -> movePiece board ((i0, j0), (i1, j1))) moves
---   where player = fromJust $ playerAt board (i0, j0)
---         moves = getPossibleMovesForPiece board (i0, j0)
-
-inf = (read "Infinity")::Double
 
 isWinning :: Board -> Player -> Bool
 isWinning board player =
