@@ -1,1 +1,1 @@
-# kmisado
+# Kamisado AI in Haskell
