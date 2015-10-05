@@ -276,9 +276,11 @@ cpuPlay board color depth = do
       cpuDstCoord = findBestMoveCoord board KBlack color depth
   case cpuDstCoord == Nothing of
     True -> do
+      -- CPU "zero" move, where src==dst
+      let cpuVoidMoveColor = cellColorAt board cpuSrcCoord
       printBoard board
-      putStrLn ("CPU blocked, your turn again" ++ " [" ++ (show color) ++ "]")
-      play board (Just color) depth
+      putStrLn ("CPU blocked, your turn again" ++ " [" ++ (show cpuVoidMoveColor) ++ "]")
+      play board (Just cpuVoidMoveColor) depth
     False -> do
       let cpuBoard = updateBoard board cpuSrcCoord $ fromJust cpuDstCoord
           cpuColor = cellColorAt cpuBoard $ fromJust cpuDstCoord
@@ -292,6 +294,7 @@ cpuPlay board color depth = do
         False -> do
           case isBlocked cpuBoard KWhite cpuColor of
             True -> do
+              -- Human "zero" move, where src==dst
               let humanVoidMoveCoord = getPlayerPieceColorCoord cpuBoard KWhite cpuColor
               let humanVoidMoveColor = cellColorAt cpuBoard humanVoidMoveCoord
               putStr ("You are blocked, the CPU will play again.." ++ " [" ++ (show humanVoidMoveColor) ++ "]")
