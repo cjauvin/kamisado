@@ -3,6 +3,8 @@
 import qualified Data.Sequence as Sequence
 import Data.Maybe
 import Data.List
+import Data.List.Split
+import Data.Char
 import Data.Foldable (toList)
 import Debug.Trace
 import Control.Exception (assert)
@@ -18,17 +20,25 @@ pattern Empty   <- (Sequence.viewl -> Sequence.EmptyL)  where Empty = Sequence.e
 pattern x :< xs <- (Sequence.viewl -> x Sequence.:< xs) where (:<)  = (Sequence.<|)
 pattern xs :> x <- (Sequence.viewr -> xs Sequence.:> x) where (:>)  = (Sequence.|>)
 
-data KColor = KRed |
-              KGreen |
+data KColor = KOrange |
               KBlue |
-              KYellow
+              KPurple |
+              KPink |
+              KYellow |
+              KRed |
+              KGreen |
+              KBrown
              deriving (Eq, Show)
 
-toColor :: KColor -> Color
-toColor KRed = Red
-toColor KGreen = Green
-toColor KBlue = Blue
-toColor KYellow = Yellow
+toColor :: KColor -> (Color, ColorIntensity)
+toColor KOrange = (Red, Vivid)
+toColor KBlue = (Cyan, Dull)
+toColor KPurple = (Blue, Dull)
+toColor KPink = (Magenta, Vivid)
+toColor KYellow = (Yellow, Vivid)
+toColor KRed = (Red, Dull)
+toColor KGreen = (Green, Dull)
+toColor KBrown = (Black, Vivid)
 
 data Player = KWhite |
               KBlack
@@ -51,14 +61,38 @@ type Coord = (Int, Int)
 
 inf = (read "Infinity")::Double
 
+-- 4 X 4
+-- initBoard :: Board
+-- initBoard = fromList [
+--   fromList [(KOrange, Just $ Piece KBlack KOrange), (KGreen, Just $ Piece KBlack KGreen),
+--             (KBlue, Just $ Piece KBlack KBlue), (KYellow, Just $ Piece KBlack KYellow)],
+--   fromList [(KYellow, Nothing), (KOrange, Nothing), (KGreen, Nothing), (KBlue, Nothing)],
+--   fromList [(KBlue, Nothing), (KYellow, Nothing), (KOrange, Nothing), (KGreen, Nothing)],
+--   fromList [(KGreen, Just $ Piece KWhite KGreen), (KBlue, Just $ Piece KWhite KBlue),
+--             (KYellow, Just $ Piece KWhite KYellow), (KOrange, Just $ Piece KWhite KOrange)]]
+
 initBoard :: Board
 initBoard = fromList [
-  fromList [(KRed, Just $ Piece KBlack KRed), (KGreen, Just $ Piece KBlack KGreen),
-            (KBlue, Just $ Piece KBlack KBlue), (KYellow, Just $ Piece KBlack KYellow)],
-  fromList [(KYellow, Nothing), (KRed, Nothing), (KGreen, Nothing), (KBlue, Nothing)],
-  fromList [(KBlue, Nothing), (KYellow, Nothing), (KRed, Nothing), (KGreen, Nothing)],
-  fromList [(KGreen, Just $ Piece KWhite KGreen), (KBlue, Just $ Piece KWhite KBlue),
-            (KYellow, Just $ Piece KWhite KYellow), (KRed, Just $ Piece KWhite KRed)]]
+  fromList [(KOrange, Just $ Piece KBlack KOrange), (KBlue, Just $ Piece KBlack KBlue),
+            (KPurple, Just $ Piece KBlack KPurple), (KPink, Just $ Piece KBlack KPink),
+            (KYellow, Just $ Piece KBlack KYellow), (KRed, Just $ Piece KBlack KRed),
+            (KGreen, Just $ Piece KBlack KGreen), (KBrown, Just $ Piece KBlack KBrown)],
+  fromList [(KRed, Nothing), (KOrange, Nothing), (KPink, Nothing), (KGreen, Nothing),
+            (KBlue, Nothing), (KYellow, Nothing), (KBrown, Nothing), (KPurple, Nothing)],
+  fromList [(KGreen, Nothing), (KPink, Nothing), (KOrange, Nothing), (KRed, Nothing),
+            (KPurple, Nothing), (KBrown, Nothing), (KYellow, Nothing), (KBlue, Nothing)],
+  fromList [(KPink, Nothing), (KPurple, Nothing), (KBlue, Nothing), (KOrange, Nothing),
+            (KBrown, Nothing), (KGreen, Nothing), (KRed, Nothing), (KYellow, Nothing)],
+  fromList [(KYellow, Nothing), (KRed, Nothing), (KGreen, Nothing), (KBrown, Nothing),
+            (KOrange, Nothing), (KBlue, Nothing), (KPurple, Nothing), (KPink, Nothing)],
+  fromList [(KBlue, Nothing), (KYellow, Nothing), (KBrown, Nothing), (KPurple, Nothing),
+            (KRed, Nothing), (KOrange, Nothing), (KPink, Nothing), (KGreen, Nothing)],
+  fromList [(KPurple, Nothing), (KBrown, Nothing), (KYellow, Nothing), (KBlue, Nothing),
+            (KGreen, Nothing), (KPink, Nothing), (KOrange, Nothing), (KRed, Nothing)],
+  fromList [(KBrown, Just $ Piece KWhite KBrown), (KGreen, Just $ Piece KWhite KGreen),
+            (KRed, Just $ Piece KWhite KRed), (KYellow, Just $ Piece KWhite KYellow),
+            (KPink, Just $ Piece KWhite KPink), (KPurple, Just $ Piece KWhite KPurple),
+            (KBlue, Just $ Piece KWhite KBlue), (KOrange, Just $ Piece KWhite KOrange)]]
 
 gridSize = length initBoard
 
@@ -217,7 +251,8 @@ isBlocked board player color =
 
 printBoardRowCells :: Seq (Cell) -> IO ()
 printBoardRowCells (c:<cs) = do
-  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background Vivid (toColor $ fst c)]
+  let (cellColor, cellIntensity) = toColor $ fst c
+  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
   putStr "     "
   printBoardRowCells cs
 printBoardRowCells Empty = do
@@ -226,17 +261,19 @@ printBoardRowCells Empty = do
 
 printBoardRowPieces :: Seq (Cell) -> IO ()
 printBoardRowPieces (c:<cs) = do
-  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background Vivid (toColor $ fst c)]
+  let (cellColor, cellIntensity) = toColor $ fst c
+      piece = snd c
+      (pieceColor, pieceIntensity) = toColor $ getColor $ fromJust piece
+  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
   putStr "  "
-  let piece = snd c
   case piece of
     Nothing -> do
-      setSGR [SetConsoleIntensity BoldIntensity, SetColor Background Vivid (toColor $ fst c)]
+      setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
       putStr " "
     _       -> do
-      setSGR [Reset, SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid (toColor $ getColor $ fromJust piece)]
+      setSGR [Reset, SetConsoleIntensity BoldIntensity, SetColor Foreground pieceIntensity pieceColor]
       putStr (getPlayerStr (fmap getPlayer piece))
-  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background Vivid (toColor $ fst c)]
+  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
   putStr "  "
   printBoardRowPieces cs
 printBoardRowPieces Empty = do
@@ -272,8 +309,10 @@ printBoard board = do
 
 cpuPlay :: Board -> KColor -> Int -> IO ()
 cpuPlay board color depth = do
+  putStr "CPU is thinking.."
   let cpuSrcCoord = getPlayerPieceColorCoord board KBlack color
       cpuDstCoord = findBestMoveCoord board KBlack color depth
+  putStrLn ""
   case cpuDstCoord == Nothing of
     True -> do
       -- CPU "zero" move, where src==dst
@@ -303,11 +342,17 @@ cpuPlay board color depth = do
             False -> do
               play cpuBoard (Just cpuColor) depth
 
+parseHumanCoords :: String -> (Coord, Coord)
+parseHumanCoords str =
+  ((digits !! 0, digits !! 1), (digits !! 2, digits !! 3))
+  where digits = map (read::String -> Int) $ wordsBy (not . isDigit) str
+
 play :: Board -> Maybe KColor -> Int -> IO ()
 play board color depth = do
+  putStr "Enter your move (src/dst coords as 4 numbers): "
   line <- getLine
   unless (line == "q") $ do
-    let (humanSrcCoord, humanDstCoord) = (read line::(Coord, Coord))
+    let (humanSrcCoord, humanDstCoord) = parseHumanCoords(line)
         isHumanMoveLegal = isLegalMove board KWhite color humanSrcCoord $ Just humanDstCoord
     case isHumanMoveLegal of
       False -> do
@@ -317,9 +362,11 @@ play board color depth = do
         let humanBoard = updateBoard board humanSrcCoord humanDstCoord
             humanColor = cellColorAt humanBoard humanDstCoord
             isHumanWinning = isWinning humanBoard KWhite
+        putStrLn ("You: " ++ (show humanSrcCoord) ++ " -> " ++ (show humanDstCoord) ++ " [" ++ (show humanColor) ++ "]")
+        printBoard humanBoard
         case isHumanWinning of
           True -> do
-              printBoard humanBoard
+              --printBoard humanBoard
               putStrLn "You won!"
               return ()
           False -> do
@@ -327,5 +374,6 @@ play board color depth = do
 
 main :: IO ()
 main = do
+  putStrLn "Welcome to Kamisado! You play White (X)"
   printBoard initBoard
   play initBoard Nothing 3
