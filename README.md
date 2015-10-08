@@ -4,7 +4,7 @@
 ```
 $ cabal sandbox init
 $ cabal install
-$ calab run
+$ cabal run
 ```
 
 ![console screenshot](https://raw.githubusercontent.com/cjauvin/kamisado/master/resources/readme.png)
