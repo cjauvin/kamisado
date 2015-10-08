@@ -10,6 +10,7 @@ import Debug.Trace
 import Control.Exception (assert)
 import Control.Monad
 import System.Console.ANSI as ANSI
+import System.IO
 
 fromList = Sequence.fromList
 index = Sequence.index
@@ -103,9 +104,10 @@ cellColorAt board (i, j) = fst (cellAt board (i, j))
 pieceAt :: Board -> Coord -> Maybe Piece
 pieceAt board (i, j) = snd (cellAt board (i, j))
 pieceColorAt :: Board -> Coord -> Maybe KColor
-pieceColorAt board (i, j) = fmap getColor $ pieceAt board (i, j)
+-- This is equivalent to: fmap getColor $ pieceAt board (i, j)
+pieceColorAt board (i, j) = getColor <$> pieceAt board (i, j)
 playerAt :: Board -> Coord -> Maybe Player
-playerAt board (i, j) = fmap getPlayer $ pieceAt board (i, j)
+playerAt board (i, j) = getPlayer <$> pieceAt board (i, j)
 cellEmpty :: Board -> Coord -> Bool
 cellEmpty board (i, j) = pieceAt board (i, j) == Nothing
 
@@ -156,8 +158,8 @@ getPossibleCoordsFromCoord board (i, j) =
 isWinning :: Board -> Player -> Bool
 isWinning board player =
   any (Just player ==) playersInWinningRow
-  where playersInWinningRow = fmap (fmap getPlayer) playerWinningRow
-        playerWinningRow = fmap snd $ index board rowIdx
+  where playersInWinningRow = (fmap getPlayer) <$> playerWinningRow
+        playerWinningRow = snd <$> index board rowIdx
         rowIdx = case player of
           KWhite -> 0
           KBlack -> gridSize - 1
@@ -252,7 +254,8 @@ isBlocked board player color =
 printBoardRowCells :: Seq (Cell) -> IO ()
 printBoardRowCells (c:<cs) = do
   let (cellColor, cellIntensity) = toColor $ fst c
-  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
+  setSGR [SetConsoleIntensity BoldIntensity,
+          SetColor Background cellIntensity cellColor]
   putStr "     "
   printBoardRowCells cs
 printBoardRowCells Empty = do
@@ -264,21 +267,25 @@ printBoardRowPieces (c:<cs) = do
   let (cellColor, cellIntensity) = toColor $ fst c
       piece = snd c
       (pieceColor, pieceIntensity) = toColor $ getColor $ fromJust piece
-  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
+  setSGR [SetConsoleIntensity BoldIntensity,
+          SetColor Background cellIntensity cellColor]
   putStr "  "
   case piece of
     Nothing -> do
-      setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
+      setSGR [SetConsoleIntensity BoldIntensity,
+              SetColor Background cellIntensity cellColor]
       putStr " "
     _       -> do
-      setSGR [Reset, SetConsoleIntensity BoldIntensity, SetColor Foreground pieceIntensity pieceColor]
-      putStr (getPlayerStr (fmap getPlayer piece))
-  setSGR [SetConsoleIntensity BoldIntensity, SetColor Background cellIntensity cellColor]
+      setSGR [Reset, SetConsoleIntensity BoldIntensity,
+              SetColor Foreground pieceIntensity pieceColor]
+      putStr (getPlayerStr (getPlayer <$> piece))
+  setSGR [SetConsoleIntensity BoldIntensity,
+          SetColor Background cellIntensity cellColor]
   putStr "  "
   printBoardRowPieces cs
 printBoardRowPieces Empty = do
   setSGR [Reset]
-  putStrLn ""
+  --putStrLn ""
 
 printBoardRows :: Board -> Int -> IO ()
 printBoardRows Empty _ = return ()
@@ -287,24 +294,27 @@ printBoardRows (r:<rs) i =
      printBoardRowCells r
      putStr $ " " ++ (show i)
      printBoardRowPieces r
+     putStrLn $ show i
      putStr "  "
      printBoardRowCells r
      printBoardRows rs (i + 1)
 
-printBoardTopCoords :: Int -> Int -> IO ()
-printBoardTopCoords i n
+printBoardColumnCoords :: Int -> Int -> IO ()
+printBoardColumnCoords i n
   | i == n    = putStrLn ""
   | otherwise =
     do
       putStr ("  " ++ (show i) ++ "  ")
-      printBoardTopCoords (i + 1) n
+      printBoardColumnCoords (i + 1) n
 
 printBoard :: Board -> IO ()
 printBoard board = do
   putStrLn ""
   putStr "  "
-  printBoardTopCoords 0 $ length board
+  printBoardColumnCoords 0 $ length board
   printBoardRows board 0
+  putStr "  "
+  printBoardColumnCoords 0 $ length board
   putStrLn ""
 
 cpuPlay :: Board -> KColor -> Int -> IO ()
@@ -319,12 +329,13 @@ cpuPlay board color depth = do
       let cpuVoidMoveColor = cellColorAt board cpuSrcCoord
       printBoard board
       putStrLn ("CPU blocked, your turn again" ++ " [" ++ (show cpuVoidMoveColor) ++ "]")
-      play board (Just cpuVoidMoveColor) depth
+      play board cpuVoidMoveColor depth
     False -> do
       let cpuBoard = updateBoard board cpuSrcCoord $ fromJust cpuDstCoord
           cpuColor = cellColorAt cpuBoard $ fromJust cpuDstCoord
           isCpuWinning = isWinning cpuBoard KBlack
-      putStrLn ("CPU: " ++ (show cpuSrcCoord) ++ " -> " ++ (show $ fromJust cpuDstCoord) ++ " [" ++ (show cpuColor) ++ "]")
+      putStrLn ("CPU: " ++ (show cpuSrcCoord) ++ " -> " ++
+                (show $ fromJust cpuDstCoord) ++ " [" ++ (show cpuColor) ++ "]")
       printBoard cpuBoard
       case isCpuWinning of
         True -> do
@@ -336,33 +347,42 @@ cpuPlay board color depth = do
               -- Human "zero" move, where src==dst
               let humanVoidMoveCoord = getPlayerPieceColorCoord cpuBoard KWhite cpuColor
               let humanVoidMoveColor = cellColorAt cpuBoard humanVoidMoveCoord
-              putStr ("You are blocked, the CPU will play again.." ++ " [" ++ (show humanVoidMoveColor) ++ "]")
+              putStr ("You are blocked, the CPU will play again.." ++
+                      " [" ++ (show humanVoidMoveColor) ++ "]")
               getLine
               cpuPlay cpuBoard humanVoidMoveColor depth
             False -> do
-              play cpuBoard (Just cpuColor) depth
+              play cpuBoard cpuColor depth
 
-parseHumanCoords :: String -> (Coord, Coord)
-parseHumanCoords str =
+parseHumanSrcAndDstCoords :: String -> (Coord, Coord)
+parseHumanSrcAndDstCoords str =
   ((digits !! 0, digits !! 1), (digits !! 2, digits !! 3))
   where digits = map (read::String -> Int) $ wordsBy (not . isDigit) str
 
-play :: Board -> Maybe KColor -> Int -> IO ()
-play board color depth = do
+parseHumanDstCoords :: String -> Coord
+parseHumanDstCoords str =
+  (digits !! 0, digits !! 1)
+  where digits = map (read::String -> Int) $ wordsBy (not . isDigit) str
+
+playFirst :: Board -> Int -> IO ()
+playFirst board depth = do
   putStr "Enter your move (src/dst coords as 4 numbers): "
+  hFlush stdout
   line <- getLine
   unless (line == "q") $ do
-    let (humanSrcCoord, humanDstCoord) = parseHumanCoords(line)
-        isHumanMoveLegal = isLegalMove board KWhite color humanSrcCoord $ Just humanDstCoord
+    let (humanSrcCoord, humanDstCoord) = parseHumanSrcAndDstCoords(line)
+        isHumanMoveLegal = isLegalMove board KWhite Nothing
+                                       humanSrcCoord $ Just humanDstCoord
     case isHumanMoveLegal of
       False -> do
         putStrLn "illegal move"
-        play board color depth
+        playFirst board depth
       True -> do
         let humanBoard = updateBoard board humanSrcCoord humanDstCoord
             humanColor = cellColorAt humanBoard humanDstCoord
             isHumanWinning = isWinning humanBoard KWhite
-        putStrLn ("You: " ++ (show humanSrcCoord) ++ " -> " ++ (show humanDstCoord) ++ " [" ++ (show humanColor) ++ "]")
+        putStrLn ("You: " ++ (show humanSrcCoord) ++ " -> " ++
+                  (show humanDstCoord) ++ " [" ++ (show humanColor) ++ "]")
         printBoard humanBoard
         case isHumanWinning of
           True -> do
@@ -372,8 +392,51 @@ play board color depth = do
           False -> do
             cpuPlay humanBoard humanColor depth
 
+play :: Board -> KColor -> Int -> IO ()
+play board color depth = do
+  putStr "Enter your move (dst coords as 2 numbers): "
+  hFlush stdout
+  line <- getLine
+  let humanSrcCoord = getPlayerPieceColorCoord board KWhite color
+  case line of
+    -- quit
+    "q" -> do
+      return ()
+    -- give the color and src coords of the piece that must be played
+    "?" -> do
+      putStrLn ("You have to play " ++ (show color) ++ ", at " ++ (show humanSrcCoord))
+      play board color depth
+    -- print board (for debug)
+    "b" -> do
+      putStrLn $ show board
+      play board color depth
+    -- dst coords
+    _  -> do
+      let humanDstCoord = parseHumanDstCoords(line)
+          --humanSrcCoord = getPlayerPieceColorCoord board KWhite color
+          isHumanMoveLegal = isLegalMove board KWhite (Just color)
+                                         humanSrcCoord $ Just humanDstCoord
+      case isHumanMoveLegal of
+        False -> do
+          putStrLn "illegal move"
+          play board color depth
+        True -> do
+          let humanBoard = updateBoard board humanSrcCoord humanDstCoord
+              humanColor = cellColorAt humanBoard humanDstCoord
+              isHumanWinning = isWinning humanBoard KWhite
+          putStrLn ("You: " ++ (show humanSrcCoord) ++ " -> " ++
+                    (show humanDstCoord) ++ " [" ++ (show humanColor) ++ "]")
+          printBoard humanBoard
+          case isHumanWinning of
+            True -> do
+                --printBoard humanBoard
+                putStrLn "You won!"
+                return ()
+            False -> do
+              cpuPlay humanBoard humanColor depth
+
 main :: IO ()
 main = do
   putStrLn "Welcome to Kamisado! You play White (X)"
   printBoard initBoard
-  play initBoard Nothing 3
+  playFirst initBoard 3
