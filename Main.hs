@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns, PatternSynonyms #-}
 
 import qualified Data.Sequence as Sequence
+import qualified Data.Set as Set
 import Data.Maybe
 import Data.List
 import Data.List.Split
@@ -29,7 +30,7 @@ data KColor = KOrange |
               KRed |
               KGreen |
               KBrown
-             deriving (Eq, Show)
+             deriving (Eq, Ord, Show)
 
 toColor :: KColor -> (Color, ColorIntensity)
 toColor KOrange = (Red, Vivid)
@@ -164,8 +165,8 @@ isWinning board player =
           KWhite -> 0
           KBlack -> gridSize - 1
 
-hasOpenPath :: Board -> Coord -> Bool
-hasOpenPath board (i, j) =
+pieceAtCoordCanWinInOne :: Board -> Coord -> Bool
+pieceAtCoordCanWinInOne board (i, j) =
   not $ null $ filter (\(i, _) -> i == playerWinningRowIdx) moves
   where player = fromJust $ playerAt board (i, j)
         moves = getPossibleCoordsFromCoord board (i, j)
@@ -173,21 +174,37 @@ hasOpenPath board (i, j) =
           KWhite -> 0
           KBlack -> gridSize - 1
 
-getBoardPotentialValueForPlayer :: Board -> Player -> Double
-getBoardPotentialValueForPlayer board player =
-  fromIntegral $ length $ filter (\(i, j) -> hasOpenPath board (i, j)) coords
-  where coords = getPlayerPieceCoords board player
+getDistinctColorsForPieceAtCoord :: Board -> Coord -> Set.Set KColor
+getDistinctColorsForPieceAtCoord board src =
+  Set.fromList $ map (cellColorAt board) dstCoords
+  where dstCoords = getPossibleCoordsFromCoord board src
 
-boardValueForPlayer :: Board -> Player -> Double
-boardValueForPlayer board player =
-  winning - losing + potentialPlayer - potentialOpponent
-  where winning = if isWinning board player
-                  then inf else 0
-        losing =  if isWinning board opponent
-                  then inf else 0
-        potentialPlayer = getBoardPotentialValueForPlayer board player
-        potentialOpponent = getBoardPotentialValueForPlayer board opponent
-        opponent = if player == KWhite then KBlack else KWhite
+boardValueForPlayer :: Board -> Player -> KColor -> Double
+boardValueForPlayer board player color =
+  -- trace (show (winning,
+  --              (fromIntegral nbWinInOnePlayerPieces),
+  --              losing,
+  --              (fromIntegral nbWinInOneOpponentPieces),
+  --              (fromIntegral nbDistinctColorsForNextOpponentMove),
+  --              pos - neg))
+  pos - neg
+  where opponent = if player == KWhite then KBlack else KWhite
+        winning = if isWinning board player then inf else 0
+        losing =  if isWinning board opponent then inf else 0
+        nbWinInOnePlayerPieces = length $ filter (\(i, j) ->
+                                                    pieceAtCoordCanWinInOne
+                                                    board (i, j)) playerPieceCoords
+        playerPieceCoords = getPlayerPieceCoords board player
+        nbWinInOneOpponentPieces = length $ filter (\(i, j) ->
+                                                      pieceAtCoordCanWinInOne
+                                                      board (i, j)) opponentPieceCoords
+        opponentPieceCoord = getPlayerPieceColorCoord board opponent color
+        nbDistinctColorsForNextOpponentMove = length $ getDistinctColorsForPieceAtCoord
+                                                       board opponentPieceCoord
+        opponentPieceCoords = getPlayerPieceCoords board opponent
+        pos = winning + (fromIntegral nbWinInOnePlayerPieces)
+        neg = losing + (fromIntegral nbWinInOneOpponentPieces) +
+              (fromIntegral nbDistinctColorsForNextOpponentMove)
 
 findBestMoveCoord :: Board -> Player -> KColor -> Int -> Maybe Coord
 findBestMoveCoord board player color depth =
@@ -210,12 +227,14 @@ isTerminal board =
   isWinning board KWhite || isWinning board KBlack
 
 negamax :: Board -> Player -> Player -> KColor -> Int -> Double
--- initPlayer: invariant player who initiated the search (the board value is always computed from his perspective)
+-- initPlayer: invariant player who initiated the search (the board
+--             value is always computed from his perspective)
 -- currPlayer: who just played whose move resulted in the `board`
--- nextColor:  of cell of last move made by `currPlayer`, thus determining the piece of next player's move
+-- nextColor: of cell of last move made by `currPlayer`, thus
+--            determining the piece of next player's move
 negamax board initPlayer currPlayer nextColor depth
   | depth == 0 || isTerminal board =
-      fn $ boardValueForPlayer board initPlayer
+      fn $ boardValueForPlayer board initPlayer nextColor
   | otherwise =
       (case null dstCoords of
         True ->
@@ -405,6 +424,10 @@ play board color depth = do
     -- give the color and src coords of the piece that must be played
     "?" -> do
       putStrLn ("You have to play " ++ (show color) ++ ", at " ++ (show humanSrcCoord))
+      play board color depth
+    "!" -> do
+      let bestHumanDstCoord = fromJust $ findBestMoveCoord board KWhite color depth
+      putStrLn ("You best move would be " ++ (show bestHumanDstCoord) ++ ", from " ++ (show color))
       play board color depth
     -- print board (for debug)
     "b" -> do
