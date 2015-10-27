@@ -16,13 +16,26 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
-executable kamisado
-  main-is:             Main.hs
+executable kamisado-cli
+  main-is:           CLI.hs
   -- other-modules:
   other-extensions:    ViewPatterns, PatternSynonyms
-  build-depends:       base >=4.8 && <4.9,
-                       containers >=0.5 && <0.6,
-                       split >=0.2 && <0.3,
-                       ansi-terminal >=0.6 && <0.7
+  build-depends:       base >=4.8 && <4.9
+                     , containers >=0.5 && <0.6
+                     , split >=0.2 && <0.3
+                     , ansi-terminal >=0.6 && <0.7
+                     , aeson
+
+executable kamisado-server
+  main-is:           Server.hs
+  -- other-modules:
+  other-extensions:    ViewPatterns, PatternSynonyms
+  build-depends:       base >=4.8 && <4.9
+                     , containers >=0.5 && <0.6
+                     , split >=0.2 && <0.3
+                     , ansi-terminal >=0.6 && <0.7
+                     , aeson
+                     , scotty
+
   -- hs-source-dirs:
   default-language:    Haskell2010
